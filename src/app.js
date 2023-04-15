@@ -52,6 +52,7 @@ app.post("/participants", async (req, res) => {
         if (participant) return res.status(409).send("Usuario ja cadastrado.")
 
         await db.collection("participants").insertOne({ name: name, lastStatus: Date.now() })
+
         await db.collection("messages").insertOne({
             from: name,
             to: 'Todos',
@@ -123,7 +124,7 @@ app.get("/messages", async (req, res) => {
     const user = req.headers.user;
     const limit = parseInt(req.query.limit)
 
-    if(req.query.limit && (isNaN(limit) || limit < 1)){
+    if (req.query.limit && (isNaN(limit) || limit < 1)) {
         return res.sendStatus(422);
     }
 
@@ -132,16 +133,28 @@ app.get("/messages", async (req, res) => {
             .find({ $or: [{ to: 'Todos' }, { to: user }, { from: user }] })
             .toArray();
 
-        if(limit) return res.send(msgs.slice(-limit).reverse());
-        
+        if (limit) return res.send(msgs.slice(-limit).reverse());
+
         res.send(msgs.reverse());
     } catch (err) {
         res.status(500).send(err.message)
     }
 })
 
-app.post("/status", (req, res) => {
-    res.send("OK");
+app.post("/status", async (req, res) => {
+    const user = req.headers.user;
+    if (!user) return sendStatus(404);
+
+    try {
+        const participant = await db.collection("participants").findOne({ name: user });
+        if (!participant) return res.sendStatus(404);
+
+        await db.collection("participants").updateOne({ name: user }, { $set: {user:user, lastStatus:Date.now()} });
+
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500).send(err.message)
+    }
 })
 
 app.listen(PORT, () => console.log(`Server running in PORT ${PORT}`));
