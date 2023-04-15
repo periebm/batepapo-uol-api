@@ -149,13 +149,34 @@ app.post("/status", async (req, res) => {
         const participant = await db.collection("participants").findOne({ name: user });
         if (!participant) return res.sendStatus(404);
 
-        await db.collection("participants").updateOne({ name: user }, { $set: {user:user, lastStatus:Date.now()} });
+        await db.collection("participants").updateOne({ name: user }, { $set: { name: user, lastStatus: Date.now() } });
 
         res.sendStatus(200);
     } catch (err) {
         res.status(500).send(err.message)
     }
 })
+
+setInterval(async () => {
+        const participantsToDelete = await db.collection("participants")
+            .find({ lastStatus: { $lte: (Date.now() - 10000)} })
+            .toArray();
+
+        const namesToDelete = participantsToDelete.map((n) => n.name);
+        await db.collection("participants").deleteMany({ name: { $in: namesToDelete } })
+        participantsToDelete.forEach(timedOut)
+}, 15000)
+
+async function timedOut(p) {
+        await db.collection("messages").insertOne({
+            from: p.name,
+            to: 'Todos',
+            text: 'sai da sala...',
+            type: 'status',
+            time: `${dayjs().format('HH:mm:ss')}` //"HH:mm:ss"
+        })
+}
+
 
 app.listen(PORT, () => console.log(`Server running in PORT ${PORT}`));
 
