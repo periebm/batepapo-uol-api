@@ -102,8 +102,8 @@ app.post("/messages", async (req, res) => {
     }
 
     try {
-        const participant = await db.collection("participants").findOne({ name: from });
-        if (!participant) return res.status(422).send("Usuario nao esta na sala.")
+        const participant = await db.collection("participants").findOne();
+        if (!participant) return res.status(422).send("Usuario nao esta na sala.");
 
         const msg = await db.collection("messages").insertOne({
             from: from,
@@ -115,15 +115,26 @@ app.post("/messages", async (req, res) => {
 
         res.sendStatus(201);
     } catch (err) {
-        res.status(500).send(err.message)
+        res.status(500).send(err.message);
     }
 })
 
-app.get("/messages", async(req, res) => {
+app.get("/messages", async (req, res) => {
+    const user = req.headers.user;
+    const limit = parseInt(req.query.limit)
+
+    if(req.query.limit && (isNaN(limit) || limit < 1)){
+        return res.sendStatus(422);
+    }
 
     try {
-        const msgs = await db.collection("messages").find().toArray();
-        res.send(msgs);
+        const msgs = await db.collection("messages")
+            .find({ $or: [{ to: 'Todos' }, { to: user }, { from: user }] })
+            .toArray();
+
+        if(limit) return res.send(msgs.slice(-limit).reverse());
+        
+        res.send(msgs.reverse());
     } catch (err) {
         res.status(500).send(err.message)
     }
