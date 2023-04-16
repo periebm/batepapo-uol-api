@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
@@ -135,6 +135,28 @@ app.get("/messages", async (req, res) => {
     }
 })
 
+app.delete("/messages/:id", async (req, res) => {
+    const { id } = req.params;
+    const user = req.headers.user;
+
+    try {
+        const msg = await db.collection("messages").findOne({ _id: new ObjectId(id) });
+        if (!msg) return res.sendStatus(404);
+
+        if(msg.from !== user) return res.sendStatus(401);
+
+        await db.collection("messages").deleteOne({_id: new ObjectId(id) })
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500).send(err.message);
+    }
+})
+
+app.put("/messages/:id", async (req, res) => {
+    
+})
+
+
 app.post("/status", async (req, res) => {
     const user = req.headers.user;
     if (!user) return sendStatus(404);
@@ -152,23 +174,23 @@ app.post("/status", async (req, res) => {
 })
 
 setInterval(async () => {
-        const participantsToDelete = await db.collection("participants")
-            .find({ lastStatus: { $lte: (Date.now() - 10000)} })
-            .toArray();
+    const participantsToDelete = await db.collection("participants")
+        .find({ lastStatus: { $lte: (Date.now() - 10000) } })
+        .toArray();
 
-        const namesToDelete = participantsToDelete.map((n) => n.name);
-        await db.collection("participants").deleteMany({ name: { $in: namesToDelete } })
-        participantsToDelete.forEach(timedOut)
+    const namesToDelete = participantsToDelete.map((n) => n.name);
+    await db.collection("participants").deleteMany({ name: { $in: namesToDelete } })
+    participantsToDelete.forEach(timedOut)
 }, 15000)
 
 async function timedOut(p) {
-        await db.collection("messages").insertOne({
-            from: p.name,
-            to: 'Todos',
-            text: 'sai da sala...',
-            type: 'status',
-            time: `${dayjs().format('HH:mm:ss')}` //"HH:mm:ss"
-        })
+    await db.collection("messages").insertOne({
+        from: p.name,
+        to: 'Todos',
+        text: 'sai da sala...',
+        type: 'status',
+        time: `${dayjs().format('HH:mm:ss')}` //"HH:mm:ss"
+    })
 }
 
 
