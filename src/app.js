@@ -8,15 +8,15 @@ import { strict as assert } from "assert";
 import { stripHtml } from "string-strip-html";
 
 
-//Create server app
+//Create server app =====================
 const app = express();
 
-//Config
+//Config ================================
 app.use(cors());
 app.use(express.json());
 dotenv.config();
 
-//Conect to database
+//Connect to database ====================
 const mongoClient = new MongoClient(process.env.DATABASE_URL)
 try {
     await mongoClient.connect()
@@ -29,12 +29,14 @@ const db = mongoClient.db();
 
 const PORT = 5000;
 
-//{name: 'João', lastStatus: 12313123} // O conteúdo do lastStatus será explicado nos próximos requisitos
 
-//{from: 'João', to: 'Todos', text: 'oi galera', type: 'message', time: '20:04:37'}
+// Endpoints ============================
 
-
-// Endpoints
+const msgSchema = joi.object({
+    to: joi.string().required(),
+    text: joi.string().required(),
+    type: joi.string().valid('message', 'private_message').required()
+})
 
 
 app.post("/participants", async (req, res) => {
@@ -84,17 +86,8 @@ app.post("/messages", async (req, res) => {
     let { to, text, type } = req.body
     const from = req.headers.user
 
-    const msgSchema = joi.object({
-        to: joi.string().required(),
-        text: joi.string().required(),
-        type: joi.string().valid('message', 'private_message').required()
-    })
-
-    const validation = msgSchema.validate(req.body, { abortEarly: false })
-    if (validation.error) {
-        console.log(validation.error)
-        return res.sendStatus(422)
-    }
+    const validation = msgSchema.validate(req.body, { abortEarly: false });
+    if (validation.error) return res.sendStatus(422);
 
     try {
         const participant = await db.collection("participants").findOne();
@@ -105,7 +98,7 @@ app.post("/messages", async (req, res) => {
             to: stripHtml(to).result.trim(),
             text: stripHtml(text).result.trim(),
             type: stripHtml(type).result.trim(),
-            time: stripHtml(`${dayjs().format('HH:mm:ss')}`).result.trim() //"HH:mm:ss"
+            time: stripHtml(`${dayjs().format('HH:mm:ss')}`).result.trim()
         })
 
         res.sendStatus(201);
@@ -143,9 +136,9 @@ app.delete("/messages/:id", async (req, res) => {
         const msg = await db.collection("messages").findOne({ _id: new ObjectId(id) });
         if (!msg) return res.sendStatus(404);
 
-        if(msg.from !== user) return res.sendStatus(401);
+        if (msg.from !== user) return res.sendStatus(401);
 
-        await db.collection("messages").deleteOne({_id: new ObjectId(id) })
+        await db.collection("messages").deleteOne({ _id: new ObjectId(id) })
         res.sendStatus(200);
     } catch (err) {
         res.status(500).send(err.message);
@@ -153,7 +146,34 @@ app.delete("/messages/:id", async (req, res) => {
 })
 
 app.put("/messages/:id", async (req, res) => {
-    
+    const { id } = req.params;
+    let { to, text, type } = req.body;
+    const user = req.headers.user;
+
+    const validation = msgSchema.validate(req.body, { abortEarly: false });
+    if (validation.error) return res.sendStatus(422);
+
+    try {
+        const participant = await db.collection("participants").findOne();
+        if (!participant) return res.status(422).send("Usuario nao esta na sala.");
+
+        const msg = await db.collection("messages").findOne({ _id: new ObjectId(id) });
+        if (!msg) return res.sendStatus(404);
+
+        if (msg.from !== user) return res.sendStatus(401);
+
+        const result = await db.collection("receitas").updateOne(
+            { _id: new ObjectId(id) },
+            { $set: {
+                to: stripHtml(to).result.trim(),
+                text: stripHtml(text).result.trim(),
+                type: stripHtml(type).result.trim(),
+            }}
+        )
+        res.sendStatus(200);
+    } catch (err) {
+        res.status(500) / send(err.message);
+    }
 })
 
 
