@@ -171,14 +171,14 @@ app.put("/messages/:id", async (req, res) => {
         )
         res.sendStatus(200);
     } catch (err) {
-        res.status(500) / send(err.message);
+        res.status(500).send(err.message)
     }
 })
 
 
 app.post("/status", async (req, res) => {
     const user = req.headers.user;
-    if (!user) return sendStatus(404);
+    if (!user) return res.sendStatus(404);
 
     try {
         const participant = await db.collection("participants").findOne({ name: user });
@@ -188,7 +188,7 @@ app.post("/status", async (req, res) => {
 
         res.sendStatus(200);
     } catch (err) {
-        res.status(500).send(err.message)
+        res.status(500).send(err.message);
     }
 })
 
