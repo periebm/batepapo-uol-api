@@ -4,6 +4,9 @@ import { MongoClient } from "mongodb";
 import dotenv from "dotenv";
 import joi from "joi";
 import dayjs from "dayjs";
+import { strict as assert } from "assert";
+import { stripHtml } from "string-strip-html";
+
 
 //Create server app
 const app = express();
@@ -35,7 +38,7 @@ const PORT = 5000;
 
 
 app.post("/participants", async (req, res) => {
-    const { name } = req.body;
+    let { name } = req.body;
 
     const participantsSchema = joi.object({
         name: joi.string().required()
@@ -51,7 +54,7 @@ app.post("/participants", async (req, res) => {
         const participant = await db.collection("participants").findOne({ name: name });
         if (participant) return res.status(409).send("Usuario ja cadastrado.")
 
-        await db.collection("participants").insertOne({ name: name, lastStatus: Date.now() })
+        await db.collection("participants").insertOne({ name: stripHtml(name).result.trim(), lastStatus: Date.now() })
 
         await db.collection("messages").insertOne({
             from: name,
@@ -77,17 +80,8 @@ app.get("/participants", async (req, res) => {
     }
 })
 
-app.delete("/participants", async (req, res) => {
-    try {
-        const r = await db.collection("messages").deleteMany({})
-        res.send("Deletado");
-    } catch (err) {
-        res.status(500).send(err.message)
-    }
-})
-
 app.post("/messages", async (req, res) => {
-    const { to, text, type } = req.body
+    let { to, text, type } = req.body
     const from = req.headers.user
 
     const msgSchema = joi.object({
@@ -107,11 +101,11 @@ app.post("/messages", async (req, res) => {
         if (!participant) return res.status(422).send("Usuario nao esta na sala.");
 
         const msg = await db.collection("messages").insertOne({
-            from: from,
-            to: to,
-            text: text,
-            type: type,
-            time: `${dayjs().format('HH:mm:ss')}` //"HH:mm:ss"
+            from: stripHtml(from).result.trim(),
+            to: stripHtml(to).result.trim(),
+            text: stripHtml(text).result.trim(),
+            type: stripHtml(type).result.trim(),
+            time: stripHtml(`${dayjs().format('HH:mm:ss')}`).result.trim() //"HH:mm:ss"
         })
 
         res.sendStatus(201);
